@@ -121,6 +121,12 @@ public:
 
     ~Vehicle();
 
+    // explicit Vehicle(QObject* parent = nullptr);  // custom STATUSLED
+    bool statusLedState() const { return _statusLedState; } //custom STATUSLED
+    bool concLedState() const { return _concLedState; } //custom STATUSLED
+    bool autonomousLedState() const { return _autonomousLedState; } //custom STATUSLED
+
+
     /// Sensor bits from sensors*Bits properties
     enum MavlinkSysStatus {
         SysStatusSensor3dGyro =                 MAV_SYS_STATUS_SENSOR_3D_GYRO,
@@ -309,6 +315,16 @@ public:
     Q_PROPERTY(Fact* hobbs              READ hobbs              CONSTANT)
     Q_PROPERTY(Fact* throttlePct        READ throttlePct        CONSTANT)
     Q_PROPERTY(Fact* imuTemp            READ imuTemp            CONSTANT)
+    Q_PROPERTY(Fact* mydata             READ mydata             CONSTANT) //custom
+    Q_PROPERTY(Fact* gas_type           READ gas_type           CONSTANT) //custom
+    Q_PROPERTY(Fact* gas_conc           READ gas_conc           CONSTANT) //custom
+    Q_PROPERTY(Fact* gas_err            READ gas_err            CONSTANT) //custom
+    Q_PROPERTY(Fact* koala_state        READ koala_state        CONSTANT) //custom
+    Q_PROPERTY(Fact* koala_clamp_busy   READ koala_clamp_busy   CONSTANT) //custom
+    Q_PROPERTY(Fact* koala_autonomous   READ koala_autonomous   CONSTANT) //custom
+
+
+
 
     Q_PROPERTY(FactGroup*           gps             READ gpsFactGroup               CONSTANT)
     Q_PROPERTY(FactGroup*           gps2            READ gps2FactGroup              CONSTANT)
@@ -341,6 +357,17 @@ public:
     Q_PROPERTY(QString  gitHash                     READ gitHash                    NOTIFY gitHashChanged)
     Q_PROPERTY(quint64  vehicleUID                  READ vehicleUID                 NOTIFY vehicleUIDChanged)
     Q_PROPERTY(QString  vehicleUIDStr               READ vehicleUIDStr              NOTIFY vehicleUIDChanged)
+
+    Q_PROPERTY(bool statusLedState READ statusLedState NOTIFY statusLedStateChanged) //custom STATUSLED
+    Q_PROPERTY(bool concLedState READ concLedState NOTIFY concLedStateChanged) //custom STATUSLED
+    Q_PROPERTY(bool autonomousLedState READ autonomousLedState NOTIFY autonomousLedStateChanged) //custom STATUSLED
+
+
+
+    Q_INVOKABLE bool getStatusLedState() const { return _statusLedState; }   //Custom STATUSLED
+    Q_INVOKABLE bool getConcLedState() const { return _concLedState; }   //Custom STATUSLED
+    Q_INVOKABLE bool getAutonomousLedState() const { return _autonomousLedState; }   //Custom STATUSLED
+
 
     /// Resets link status counters
     Q_INVOKABLE void resetCounters  ();
@@ -706,6 +733,15 @@ public:
     Fact* hobbs                             () { return &_hobbsFact; }
     Fact* throttlePct                       () { return &_throttlePctFact; }
     Fact* imuTemp                           () { return &_imuTempFact; }
+    Fact* mydata                            () { return &_mydataFact; } //custom
+    Fact* gas_type                          () { return &_gas_typeFact; } //custom
+    Fact* gas_conc                          () { return &_gas_concFact; } //custom
+    Fact* gas_err                           () { return &_gas_errFact; } //custom
+    Fact* koala_state                       () { return &_koala_stateFact; } //custom
+    Fact* koala_clamp_busy                  () { return &_koala_clamp_busyFact; } //custom
+    Fact* koala_autonomous                  () { return &_koala_autonomousFact; } //custom
+
+
 
     FactGroup* gpsFactGroup                 () { return &_gpsFactGroup; }
     FactGroup* gps2FactGroup                () { return &_gps2FactGroup; }
@@ -988,6 +1024,10 @@ signals:
     void requiresGpsFixChanged          ();
     void haveMRSpeedLimChanged          ();
     void haveFWSpeedLimChanged          ();
+    void statusLedStateChanged();        //custom STATUSLED
+    void concLedStateChanged();        //custom STATUSLED
+    void autonomousLedStateChanged();        //custom STATUSLED
+
 
     void firmwareVersionChanged         ();
     void firmwareCustomVersionChanged   ();
@@ -1126,6 +1166,10 @@ private:
     void _setMessageInterval            (int messageId, int rate);
     EventHandler& _eventHandler         (uint8_t compid);
     bool setFlightModeCustom            (const QString& flightMode, uint8_t* base_mode, uint32_t* custom_mode);
+    void _handleDebugVect               (mavlink_message_t& message); //custom
+    void _handleDebugInt                (mavlink_message_t& message); //custom
+
+
 
     static void _rebootCommandResultHandler(void* resultHandlerData, int compId, const mavlink_command_ack_t& ack, MavCmdResultFailureCode_t failureCode);
 
@@ -1194,6 +1238,10 @@ private:
     bool            _readyToFlyAvailable                    = false;
     bool            _readyToFly                             = false;
     bool            _allSensorsHealthy                      = true;
+    bool            _statusLedState;   //custom STATUS LED
+    bool            _concLedState;   //custom STATUS LED
+    bool            _autonomousLedState;   //custom STATUS LED
+
 
     SysStatusSensorInfo _sysStatusSensorInfo;
 
@@ -1414,6 +1462,17 @@ private:
     Fact _hobbsFact;
     Fact _throttlePctFact;
     Fact _imuTempFact;
+    Fact _mydataFact; //custom
+    Fact _gas_typeFact; //custom
+    Fact _gas_concFact; //custom
+    Fact _gas_errFact; //custom
+    Fact _koala_stateFact; //custom
+    Fact _koala_clamp_busyFact; //custom
+    Fact _koala_autonomousFact; //custom
+
+
+
+
 
     VehicleGPSFactGroup             _gpsFactGroup;
     VehicleGPS2FactGroup            _gps2FactGroup;
@@ -1492,6 +1551,16 @@ private:
     static const char* _generatorFactGroupName;
     static const char* _efiFactGroupName;
     static const char* _terrainFactGroupName;
+
+    static const char* _mydataFactName; //custom
+    static const char* _gas_typeFactName; //custom
+    static const char* _gas_concFactName; //custom
+    static const char* _gas_errFactName; //custom
+    static const char* _koala_stateFactName; //custom
+    static const char* _koala_clamp_busyFactName; //custom
+    static const char* _koala_autonomousFactName; //custom
+    int _old_koala_state;
+
 
     static const int _vehicleUIUpdateRateMSecs      = 100;
 

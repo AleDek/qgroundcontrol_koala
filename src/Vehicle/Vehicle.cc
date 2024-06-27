@@ -118,6 +118,15 @@ const char* Vehicle::_hygrometerFactGroupName =         "hygrometer";
 const char* Vehicle::_generatorFactGroupName =          "generator";
 const char* Vehicle::_efiFactGroupName =                "efi";
 
+const char* Vehicle::_mydataFactName =             "mydata"; //custom
+const char* Vehicle::_gas_typeFactName =           "gas_type"; //custom
+const char* Vehicle::_gas_concFactName =           "gas_conc"; //custom
+const char* Vehicle::_gas_errFactName =            "gas_err"; //custom
+const char* Vehicle::_koala_stateFactName =        "koala_state"; //custom
+const char* Vehicle::_koala_clamp_busyFactName =   "koala_clamp_busy"; //custom
+const char* Vehicle::_koala_autonomousFactName =   "koala_autonomous"; //custom
+
+
 // Standard connected vehicle
 Vehicle::Vehicle(LinkInterface*             link,
                  int                        vehicleId,
@@ -168,6 +177,13 @@ Vehicle::Vehicle(LinkInterface*             link,
     , _hobbsFact                    (0, _hobbsFactName,             FactMetaData::valueTypeString)
     , _throttlePctFact              (0, _throttlePctFactName,       FactMetaData::valueTypeUint16)
     , _imuTempFact                  (0, _imuTempFactName,           FactMetaData::valueTypeInt16)
+    , _mydataFact                   (0, _mydataFactName,            FactMetaData::valueTypeDouble) //custom
+    , _gas_typeFact                 (0, _gas_typeFactName,          FactMetaData::valueTypeString) //custom
+    , _gas_concFact                 (0, _gas_concFactName,          FactMetaData::valueTypeFloat) //custom
+    , _gas_errFact                  (0, _gas_errFactName,           FactMetaData::valueTypeString) //custom
+    , _koala_stateFact              (0, _koala_stateFactName,       FactMetaData::valueTypeString) //custom
+    , _koala_clamp_busyFact         (0, _koala_clamp_busyFactName,  FactMetaData::valueTypeInt16) //custom
+    , _koala_autonomousFact         (0, _koala_autonomousFactName,  FactMetaData::valueTypeInt16) //custom
     , _gpsFactGroup                 (this)
     , _gps2FactGroup                (this)
     , _windFactGroup                (this)
@@ -268,6 +284,7 @@ Vehicle::Vehicle(LinkInterface*             link,
 
     // Start timer to limit altitude above terrain queries
     _altitudeAboveTerrQueryTimer.restart();
+    _old_koala_state = -1; //custom
 }
 
 // Disconnected Vehicle for offline editing
@@ -320,6 +337,13 @@ Vehicle::Vehicle(MAV_AUTOPILOT              firmwareType,
     , _hobbsFact                        (0, _hobbsFactName,             FactMetaData::valueTypeString)
     , _throttlePctFact                  (0, _throttlePctFactName,       FactMetaData::valueTypeUint16)
     , _imuTempFact                      (0, _imuTempFactName,           FactMetaData::valueTypeInt16)
+    , _mydataFact                       (0, _mydataFactName,            FactMetaData::valueTypeDouble) //custom
+    , _gas_typeFact                     (0, _gas_typeFactName,          FactMetaData::valueTypeString) //custom
+    , _gas_concFact                     (0, _gas_concFactName,          FactMetaData::valueTypeFloat) //custom
+    , _gas_errFact                      (0, _gas_errFactName,           FactMetaData::valueTypeString) //custom
+    , _koala_stateFact                  (0, _koala_stateFactName,       FactMetaData::valueTypeString) //custom
+    , _koala_clamp_busyFact             (0, _koala_clamp_busyFactName,  FactMetaData::valueTypeInt16) //custom
+    , _koala_autonomousFact             (0, _koala_autonomousFactName,  FactMetaData::valueTypeInt16) //custom
     , _gpsFactGroup                     (this)
     , _gps2FactGroup                    (this)
     , _windFactGroup                    (this)
@@ -343,6 +367,8 @@ Vehicle::Vehicle(MAV_AUTOPILOT              firmwareType,
 
     _offlineFirmwareTypeSettingChanged(_firmwareType);  // This adds correct terrain capability bit
     _firmwarePlugin->initializeVehicle(this);
+    _old_koala_state = -1; //custom
+
 }
 
 void Vehicle::trackFirmwareVehicleTypeChanges(void)
@@ -457,6 +483,15 @@ void Vehicle::_commonInit()
     _addFact(&_distanceToGCSFact,       _distanceToGCSFactName);
     _addFact(&_throttlePctFact,         _throttlePctFactName);
     _addFact(&_imuTempFact,             _imuTempFactName);
+
+    _addFact(&_mydataFact,               _mydataFactName); //custom
+    _addFact(&_gas_typeFact,             _gas_typeFactName); //custom
+    _addFact(&_gas_concFact,             _gas_concFactName); //custom
+    _addFact(&_koala_stateFact,          _koala_stateFactName); //custom
+    _addFact(&_koala_clamp_busyFact,     _koala_clamp_busyFactName); //custom
+    _addFact(&_koala_autonomousFact,     _koala_autonomousFactName); //custom
+
+
 
     _hobbsFact.setRawValue(QVariant(QString("0000:00:00")));
     _addFact(&_hobbsFact,               _hobbsFactName);
@@ -784,6 +819,12 @@ void Vehicle::_mavlinkMessageReceived(LinkInterface* link, mavlink_message_t mes
         break;
     case MAVLINK_MSG_ID_FENCE_STATUS:
         _handleFenceStatus(message);
+        break;
+    case MAVLINK_MSG_ID_DEBUG_VECT: //custom
+        _handleDebugVect(message);
+        break;
+    case MAVLINK_MSG_ID_DEBUG: //custom
+        _handleDebugInt(message);
         break;
 
     case MAVLINK_MSG_ID_EVENT:
@@ -1326,6 +1367,178 @@ void Vehicle::_handleAltitude(mavlink_message_t& message)
     _altitudeMessageAvailable = true;
     _altitudeRelativeFact.setRawValue(altitude.altitude_relative);
     _altitudeAMSLFact.setRawValue(altitude.altitude_amsl);
+}
+
+void Vehicle::_handleDebugVect(mavlink_message_t& message)  //custom
+{
+    // only accept the attitude message from the vehicle's flight controller
+
+    // if (message.sysid != 240 || message.compid != _compID) {
+    //     return;
+    // }
+
+    // printf("get debug\n");
+
+    mavlink_debug_vect_t vect;
+    mavlink_msg_debug_vect_decode(&message, &vect);
+
+    
+    // _gas_typeFact.setRawValue(vect.x);
+    int gas_type_id = vect.x;
+    float concentration = vect.y;
+    int error_id = vect.z;
+
+    _gas_concFact.setRawValue(vect.y);
+    // _gas_errFact.setRawValue(vect.z);
+
+    switch(gas_type_id){
+        case 0 : _gas_typeFact.setRawValue("No Gas"); break;
+        case 1 : _gas_typeFact.setRawValue("Hydrogen"); break;
+        case 2 : _gas_typeFact.setRawValue("Hydrogen Mixture"); break;
+        case 3 : _gas_typeFact.setRawValue("Methane"); break;
+        case 4 : _gas_typeFact.setRawValue("Light Gas"); break;
+        case 5 : _gas_typeFact.setRawValue("Medium Gas"); break;
+        case 6 : _gas_typeFact.setRawValue("Heavy Gas"); break;
+        case 253 : _gas_typeFact.setRawValue("Unknown Gas"); break;
+        case 254 : _gas_typeFact.setRawValue("Under Range, <5 %LEL"); break;
+        case 255 : _gas_typeFact.setRawValue("Over Range, >100 %LEL"); break;
+        default: _gas_typeFact.setRawValue(" "); break;
+    }
+
+    switch(error_id){
+        case 0x00 : _gas_errFact.setRawValue("OK"); break;
+        case 0x01 : _gas_errFact.setRawValue("CRC_FAILED"); break;
+        case 0x02 : _gas_errFact.setRawValue("BAD_PARAM"); break;
+        case 0x03 : _gas_errFact.setRawValue("EXE_FAILED"); break;
+        case 0x04 : _gas_errFact.setRawValue("NO_MEM"); break;
+        case 0x05 : _gas_errFact.setRawValue("UNKNOWN_CMD"); break;
+        case 0x07 : _gas_errFact.setRawValue("INCOMPLETE_COMMAND"); break;
+        case 0x20 : _gas_errFact.setRawValue("HW_ERR_AO"); break;
+        case 0x21 : _gas_errFact.setRawValue("HW_ERR_VDD"); break;
+        case 0x22 : _gas_errFact.setRawValue("HW_ERR_VREF"); break;
+        case 0x23 : _gas_errFact.setRawValue("HW_ENV_XCD_RANGE "); break;
+        case 0x24 : _gas_errFact.setRawValue("HW_ENV_SNSR_MALFUNCTION"); break;
+        case 0x25 : _gas_errFact.setRawValue("HW_ERR_MCU_FLASH"); break;
+        case 0x26 : _gas_errFact.setRawValue("HW_SENSOR_INITIALIZATION"); break;
+        case 0x30 : _gas_errFact.setRawValue("HW_SENSOR_NEGATIVE"); break;
+        case 0x31 : _gas_errFact.setRawValue("HW_CONDENSE_COND"); break;
+        case 0X32 : _gas_errFact.setRawValue("HW_SENSOR_MALFUNCTION"); break;
+        default: _gas_errFact.setRawValue(" "); break;
+    }
+
+
+
+    // _mydataFact.setRawValue(1926.0);
+
+    // // Aggiorna _statusledState
+    // if(vect.z > 0) _statusLedState = true;  
+    // else _statusLedState = false;  
+
+    if(concentration > 0.0) _concLedState = true;  
+    else _concLedState = false;  
+
+    if(_concLedState){
+        QString messageText;
+        messageText = QStringLiteral("Emergency, explosive gas at %1 percent ").arg(vect.y, 0, 'f', 1);
+        qgcApp()->toolbox()->audioOutput()->say(messageText);
+    }
+    // Emetti il segnale per notificare QML del cambiamento
+    emit concLedStateChanged();
+}
+
+void Vehicle::_handleDebugInt(mavlink_message_t& message)  //custom
+{
+    // only accept the attitude message from the vehicle's flight controller
+
+    // if (message.sysid != 240 || message.compid != _compID) {
+    //     return;
+    // }
+
+    // printf("get debug INT\n");
+
+    mavlink_debug_t dbg_int;
+    mavlink_msg_debug_decode(&message, &dbg_int);
+
+    
+  
+    int koala_state = dbg_int.ind;
+    int clamp_busy = dbg_int.value;
+    QString messageText;
+
+    _koala_clamp_busyFact.setRawValue(clamp_busy);
+
+    switch(koala_state){
+        case 0 :  _koala_stateFact.setRawValue("flyng_idle"); break;               //man
+        case 1 :  _koala_stateFact.setRawValue("abort_landing"); break;            //auto
+        case 2 :  _koala_stateFact.setRawValue("return_to_recovery"); break;       //auto
+        case 3 :  _koala_stateFact.setRawValue("go_land_on_pipe"); break;           //auto
+        case 4 :  _koala_stateFact.setRawValue("go_land_on_aruco"); break;          //auto
+        case 5 :  _koala_stateFact.setRawValue("landing_compute_goal"); break;         //auto
+        case 6 :  _koala_stateFact.setRawValue("landing_approaching"); break;           //auto
+        case 7 :  _koala_stateFact.setRawValue("landing_correction"); break;            //auto
+        case 8 :  _koala_stateFact.setRawValue("landing_descent"); break;           //auto
+        case 9 :  _koala_stateFact.setRawValue("landing_grasping"); break;       //auto
+        case 10 : _koala_stateFact.setRawValue("landing_terminated "); break;   //auto
+        case 11 : _koala_stateFact.setRawValue("landed_on_pipe"); break;        //manual
+        case 12 : _koala_stateFact.setRawValue("landed"); break;                //manual
+        case 13 : _koala_stateFact.setRawValue("go_auto_takeoff"); break;          //auto
+        case 14 : _koala_stateFact.setRawValue("takeoff_prebending"); break;        //auto
+        case 15 : _koala_stateFact.setRawValue("taking_off"); break;                //auto
+        default:  _koala_stateFact.setRawValue("unknown state ! "); break;
+    }
+
+    switch(koala_state){
+        case 0 :       messageText = QStringLiteral("flyng_idle"); break;               //man
+        case 1 :       messageText = QStringLiteral("abort_landing"); break;            //auto
+        case 2 :       messageText = QStringLiteral("return_to_recovery"); break;       //auto
+        case 3 :       messageText = QStringLiteral("go_land_on_pipe"); break;           //auto
+        case 4 :       messageText = QStringLiteral("go_land_on_aruco"); break;          //auto
+        case 5 :       messageText = QStringLiteral("landing_compute_goal"); break;         //auto
+        case 6 :       messageText = QStringLiteral("landing_approaching"); break;           //auto
+        case 7 :       messageText = QStringLiteral("landing_correction"); break;            //auto
+        case 8 :       messageText = QStringLiteral("landing_descent"); break;           //auto
+        case 9 :       messageText = QStringLiteral("landing_grasping"); break;       //auto
+        case 10 :      messageText = QStringLiteral("landing_terminated"); break;   //auto
+        case 11 :      messageText = QStringLiteral("landed_on_pipe"); break;        //manual
+        case 12 :      messageText = QStringLiteral("landed"); break;                //manual
+        case 13 :      messageText = QStringLiteral("go_auto_takeoff"); break;          //auto
+        case 14 :      messageText = QStringLiteral("takeoff_prebending"); break;        //auto
+        case 15 :      messageText = QStringLiteral("taking_off"); break;                //auto
+        default:       messageText = QStringLiteral("unknown state !"); break;
+    }
+
+
+    
+
+    if(koala_state == 0 || koala_state == 11 || koala_state == 12){
+        _koala_autonomousFact.setRawValue(0);
+        _autonomousLedState = false;
+    }
+    else{
+        _koala_autonomousFact.setRawValue(1);
+        _autonomousLedState = true;
+
+    }
+
+
+    // Aggiorna _statusledState
+    if(clamp_busy > 0) _statusLedState = true;  
+    else _statusLedState = false;  
+
+
+    
+    if(_old_koala_state != koala_state){
+        // QString messageText = _koala_stateFact.getRawValue();
+        // messageText = QStringLiteral("Emergency, explosive gas at %1 percent ").arg(vect.y, 0, 'f', 1);
+        qgcApp()->toolbox()->audioOutput()->say(messageText);
+    }
+    _old_koala_state = koala_state;
+    
+
+    // Emetti il segnale per notificare QML del cambiamento
+    emit statusLedStateChanged();
+    emit autonomousLedStateChanged();
+
 }
 
 void Vehicle::_setCapabilities(uint64_t capabilityBits)
