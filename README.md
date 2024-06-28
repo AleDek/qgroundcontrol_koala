@@ -1,5 +1,5 @@
 # QgroundControl for Koala Drone
--apk file in buildandroid/build/output/apk
+-apk file in buildandroid/build/output/apk (removed because of size, follow procedure in android_envitonement.sh)
 -appimage file in deploy
 
 -build instruction in android_envitonement.sh
