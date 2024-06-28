@@ -37,6 +37,8 @@ export ANDROID_NDK_TOOLS_PREFIX=aarch64-linux-android
 # find .appimage in deploy folder
 
 ### COMPILAZIONE ANDROID
+#--- ./docker_connection.sh
+#--- 1 qgc-build-android
 #not source this 
 #in qgc root dir
 #mkdir buildandroid
