@@ -1,3 +1,9 @@
+# QgroundControl for Koala Drone
+-apk file in buildandroid/build/output/apk
+-appimage file in deploy
+
+-build instruction in android_envitonement.sh
+
 # QGroundControl Ground Control Station
 
 [![Releases](https://img.shields.io/github/release/mavlink/QGroundControl.svg)](https://github.com/mavlink/QGroundControl/releases)

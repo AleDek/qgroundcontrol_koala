@@ -28,8 +28,17 @@ export ANDROID_NDK_TOOLS_PREFIX=aarch64-linux-android
 # >~/local/Qt/5.4/android_armv7/bin/androiddeployqt --input ./android-libQGroundControl.so-deployment-settings.json --output ./android-build --deployment bundled --android-platform android-22 --jdk /System/Library/Frameworks/JavaVM.framework/Versions/CurrentJDK/Home --verbose --ant /usr/local/bin/ant
 # /opt/Qt/5.15.2/android/bin
 
-###-----------------
-#nor source this 
+## COMPILAZIONE LINUX
+# in qgc rppt dir
+# docker build --file ./deploy/docker/Dockerfile-build-linux -t qgc-linux-docker .
+# docker run --rm -v ${PWD}:/project/source -v ${PWD}/build:/project/build qgc-linux-docker
+# cd deploy
+# ./create_linux_appimage.sh ../ ../build/staging 
+# find .appimage in deploy folder
+
+### COMPILAZIONE ANDROID
+#not source this 
+#in qgc root dir
 #mkdir buildandroid
 #cd buildandroid
 #qmake -r ../ ANDROID_ABIS="armeabi-v7a arm64-v8a" CONFIG+="debug"

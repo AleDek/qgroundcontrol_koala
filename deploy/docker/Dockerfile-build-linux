@@ -71,4 +71,4 @@ RUN useradd user --create-home --home-dir /home/user --shell /bin/bash --uid 100
 USER user
 
 WORKDIR /project/build
-CMD qmake /project/source && make -j24
+CMD qmake /project/source && make -j12 CONFIG+="release"

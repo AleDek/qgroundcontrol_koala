@@ -41,12 +41,45 @@ ColumnLayout {
         width: availableWidth
         property var horizontal: QtObject {
             property string name: qsTr("Horizontal")
-            property string plotTitle: qsTr("Horizontal (Y direction, sidewards)")
-            property var plot: [
-                { name: "Response", value: globals.activeVehicle.localPosition.y.value },
-                { name: "Setpoint", value: globals.activeVehicle.localPositionSetpoint.y.value }
-            ]
-            property var params: ListModel {
+            property Fact _diffGains: controller.getParameterFact(-1, "MPC_XY_DIFFGAINS", false) //custom diffgains
+
+            // property string plotTitle: qsTr("Horizontal (Y direction, sidewards)")
+            property string plotTitle: qsTr("Horizontal (X and Y directions)") //custom diffgains
+            property var plot: 
+            if(_diffGains.rawValue){
+                return [
+                    { name: "Response X", value: globals.activeVehicle.localPosition.x.value },
+                    { name: "Setpoint X", value: globals.activeVehicle.localPositionSetpoint.x.value },
+                    { name: "Response Y", value: globals.activeVehicle.localPosition.y.value },
+                    { name: "Setpoint Y", value: globals.activeVehicle.localPositionSetpoint.y.value }
+                ]
+            }else{
+                return [
+                    { name: "Response Y", value: globals.activeVehicle.localPosition.y.value },
+                    { name: "Setpoint Y", value: globals.activeVehicle.localPositionSetpoint.y.value }
+                ]
+            }
+
+            property var diff_params: ListModel {
+                ListElement {
+                    title:          qsTr("Proportional gain (MPC_X_P)")
+                    description:    qsTr("Increase for more responsiveness, reduce if the position overshoots (there is only a setpoint when hovering, i.e. when centering the stick).")
+                    param:          "MPC_X_P"
+                    min:            0
+                    max:            2
+                    step:           0.05
+                }
+                ListElement {
+                    title:          qsTr("Proportional gain (MPC_Y_P)")
+                    description:    qsTr("Increase for more responsiveness, reduce if the position overshoots (there is only a setpoint when hovering, i.e. when centering the stick).")
+                    param:          "MPC_Y_P"
+                    min:            0
+                    max:            2
+                    step:           0.05
+                }
+            }
+
+            property var std_params: ListModel {
                 ListElement {
                     title:          qsTr("Proportional gain (MPC_XY_P)")
                     description:    qsTr("Increase for more responsiveness, reduce if the position overshoots (there is only a setpoint when hovering, i.e. when centering the stick).")
@@ -56,6 +89,10 @@ ColumnLayout {
                     step:           0.05
                 }
             }
+
+            property var params : _diffGains.rawValue ? diff_params : std_params
+            
+
         }
         property var vertical: QtObject {
             property string name: qsTr("Vertical")

@@ -41,12 +41,25 @@ ColumnLayout {
         width: availableWidth
         property var horizontal: QtObject {
             property string name: qsTr("Horizontal")
-            property string plotTitle: qsTr("Horizontal (Y direction, sidewards)")
-            property var plot: [
-                { name: "Response", value: globals.activeVehicle.localPosition.vy.value },
-                { name: "Setpoint", value: globals.activeVehicle.localPositionSetpoint.vy.value }
-            ]
-            property var params: ListModel {
+            // property string plotTitle: qsTr("Horizontal (Y direction, sidewards)")
+            property Fact _diffGains: controller.getParameterFact(-1, "MPC_XY_DIFFGAINS", false) //custom diffgains
+            property string plotTitle: qsTr("Horizontal (X and Y direction)") //custom diffgains
+            property var plot: 
+                if(_diffGains.rawValue){
+                    return [
+                        { name: "Response X", value: globals.activeVehicle.localPosition.vx.value },
+                        { name: "Setpoint X", value: globals.activeVehicle.localPositionSetpoint.vx.value },
+                        { name: "Response Y", value: globals.activeVehicle.localPosition.vy.value },
+                        { name: "Setpoint Y", value: globals.activeVehicle.localPositionSetpoint.vy.value }
+                    ]
+                }else{
+                    return [
+                        { name: "Response", value: globals.activeVehicle.localPosition.vy.value },
+                        { name: "Setpoint", value: globals.activeVehicle.localPositionSetpoint.vy.value }
+                    ]
+                }
+
+            property var std_params : ListModel{
                 ListElement {
                     title:          qsTr("Proportional gain (MPC_XY_VEL_P_ACC)")
                     description:    qsTr("Increase for more responsiveness, reduce if the velocity overshoots (and increasing D does not help).")
@@ -72,6 +85,59 @@ ColumnLayout {
                     step:           0.05
                 }
             }
+
+            property var diff_params : ListModel {
+                ListElement {
+                    title:          qsTr("Proportional gain (MPC_X_VEL_P_ACC)")
+                    description:    qsTr("Increase for more responsiveness, reduce if the velocity overshoots (and increasing D does not help).")
+                    param:          "MPC_X_VEL_P_ACC"
+                    min:            1.2
+                    max:            5
+                    step:           0.05
+                }
+                ListElement {
+                    title:          qsTr("Proportional gain (MPC_Y_VEL_P_ACC)")
+                    description:    qsTr("Increase for more responsiveness, reduce if the velocity overshoots (and increasing D does not help).")
+                    param:          "MPC_Y_VEL_P_ACC"
+                    min:            1.2
+                    max:            5
+                    step:           0.05
+                }
+                ListElement {
+                    title:          qsTr("Integral gain (MPC_X_VEL_I_ACC)")
+                    description:    qsTr("Increase to reduce steady-state error (e.g. wind)")
+                    param:          "MPC_X_VEL_I_ACC"
+                    min:            0.2
+                    max:            10
+                    step:           0.2
+                }
+                ListElement {
+                    title:          qsTr("Integral gain (MPC_Y_VEL_I_ACC)")
+                    description:    qsTr("Increase to reduce steady-state error (e.g. wind)")
+                    param:          "MPC_Y_VEL_I_ACC"
+                    min:            0.2
+                    max:            10
+                    step:           0.2
+                }
+                ListElement {
+                    title:          qsTr("Differential gain (MPC_X_VEL_D_ACC)")
+                    description:    qsTr("Damping: increase to reduce overshoots and oscillations, but not higher than really needed.")
+                    param:          "MPC_X_VEL_D_ACC"
+                    min:            0.1
+                    max:            2
+                    step:           0.05
+                }
+                ListElement {
+                    title:          qsTr("Differential gain (MPC_Y_VEL_D_ACC)")
+                    description:    qsTr("Damping: increase to reduce overshoots and oscillations, but not higher than really needed.")
+                    param:          "MPC_Y_VEL_D_ACC"
+                    min:            0.1
+                    max:            2
+                    step:           0.05
+                }
+            }
+
+            property var params : _diffGains.rawValue ? diff_params : std_params
         }
         property var vertical: QtObject {
             property string name: qsTr("Vertical")
