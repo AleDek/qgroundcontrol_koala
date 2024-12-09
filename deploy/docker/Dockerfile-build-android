@@ -1,0 +1,126 @@
+#
+# QGroundControl android build environment
+#
+
+FROM ubuntu:20.04
+LABEL authors="Alessandro De Crescenzo <ale-dc@live.it>"
+
+# ARG QT_VERSION=5.15.2
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+ENV DISPLAY=:99
+
+# ENV QMAKESPEC linux-g++-64
+
+# ENV QT_PATH /opt/Qt
+# ENV QT_DESKTOP $QT_PATH/${QT_VERSION}/gcc_64
+
+# ENV PATH /usr/lib/ccache:$QT_DESKTOP/bin:$PATH
+
+RUN apt-get update && apt-get -y --quiet --no-install-recommends install \
+		sudo \
+		nano \
+		apt-utils \
+		binutils \
+		build-essential \
+		ca-certificates \
+		ccache \
+		checkinstall \
+		cmake \
+		curl \
+		espeak \
+		fuse \
+		g++ \
+		gcc \
+		git \
+		gosu \
+		kmod \
+		libespeak-dev \
+		libfontconfig1 \
+		libfuse2 \
+		libgstreamer-plugins-base1.0-dev \
+		libgstreamer1.0-0 \
+		libgstreamer1.0-dev \
+		libsdl2-dev \
+		libssl-dev \
+		libudev-dev \
+		locales \
+		make \
+		ninja-build \
+		openssh-client \
+		openssl \
+		patchelf \
+		pkg-config \
+		rsync \
+		speech-dispatcher \
+		wget \
+		xvfb \
+		zlib1g-dev \
+		unzip \
+		libstdc++6 \
+		libgcc1 \
+		zlib1g \
+		libncurses5 \
+	&& apt-get -y autoremove \
+	&& apt-get clean autoclean \
+	&& rm -rf /var/lib/apt/lists/{apt,dpkg,cache,log} /tmp/* /var/tmp/*
+
+# Reconfigure locale
+RUN locale-gen en_US.UTF-8 && dpkg-reconfigure locales
+
+# Install Qt 5.15.2
+COPY deploy/docker/install-qt-android.sh /tmp/qt/
+RUN /tmp/qt/install-qt-android.sh
+RUN echo 'PATH="$PATH:/opt/Qt/5.15.2/android/bin"' >> /root/.bashrc
+ENV PATH=$PATH:/opt/Qt/5.15.2/android/bin
+
+
+#install JDK 11
+RUN apt-get install openjdk-11-jdk -y
+RUN echo 'export JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64' >> /root/.bashrc 
+RUN echo 'PATH=$PATH:$JAVA_HOME/bin' >> /root/.bashrc 
+ENV JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64
+ENV PATH=$PATH:$JAVA_HOME/bin 
+
+#install android cmdline-tools sdk ndk
+# RUN mkdir -p /root/Android/Sdk/cmdline-tools 
+SHELL ["/bin/bash", "-c"] 
+WORKDIR /root/Android/Sdk/
+ENV ANDROID_HOME=/root/Android/Sdk
+ENV PATH=$PATH:$ANDROID_HOME/cmdline-tools/tools/bin:$ANDROID_HOME/platform-tools
+RUN mkdir -p cmdline-tools && cd cmdline-tools/  \
+	&& wget https://dl.google.com/android/repository/commandlinetools-linux-6200805_latest.zip \
+	&& unzip commandlinetools-linux-6200805_latest.zip \
+	&& rm commandlinetools-linux-6200805_latest.zip \
+	&& echo 'export ANDROID_HOME=/root/Android/Sdk' >> /root/.bashrc \
+	&& echo 'PATH="$PATH:$ANDROID_HOME/cmdline-tools/tools/bin:$ANDROID_HOME/platform-tools"' >> /root/.bashrc 
+RUN echo yes | ./cmdline-tools/tools/bin/sdkmanager "platform-tools" "platforms;android-29" "build-tools;29.0.3"
+RUN echo yes | ./cmdline-tools/tools/bin/sdkmanager "ndk;21.3.6528147" 
+	
+# install gstreamer support for android
+WORKDIR /tmp/gstreamer_android/gstreamer-1.0-android-universal-1.18.6
+RUN wget https://gstreamer.freedesktop.org/data/pkg/android/1.18.6/gstreamer-1.0-android-universal-1.18.6.tar.xz \
+	&& tar -xvf gstreamer-1.0-android-universal-1.18.6.tar.xz \
+	&& rm gstreamer-1.0-android-universal-1.18.6.tar.xz
+
+
+RUN echo 'export ANDROID_HOME=/root/Android/Sdk' >> /root/.bashrc \
+	&& echo 'export ANDROID_SDK_ROOT=/root/Android/Sdk' >> /root/.bashrc \
+	&& echo 'export ANDROID_NDK_ROOT=/root/Android/Sdk/ndk/21.3.6528147' >> /root/.bashrc 
+ENV ANDROID_HOME=/root/Android/Sdk
+ENV ANDROID_SDK_ROOT=/root/Android/Sdk
+ENV ANDROID_NDK_ROOT=/root/Android/Sdk/ndk/21.3.6528147
+
+# create user with id 1000 to not run commands/generate files as root
+# RUN useradd user --create-home --home-dir /home/user --shell /bin/bash --uid 1000
+# USER user
+
+WORKDIR /project/buildandroid
+CMD cp -r /tmp/gstreamer_android/gstreamer-1.0-android-universal-1.18.6 /project/source/gstreamer-1.0-android-universal-1.18.6 \
+	&& qmake -r /project/source/ ANDROID_ABIS="armeabi-v7a arm64-v8a" CONFIG+="debug" \
+	&& make -j24 install INSTALL_ROOT=./ \
+	&& androiddeployqt --input ./android-QGroundControl-deployment-settings.json --output ./ --deployment bundled \
+	&& rm -r /project/source/gstreamer-1.0-android-universal-1.18.6
+
+# CMD ["/bin/bash", "-l", "-c", "/project/source/deploy/docker/build_android.sh"]

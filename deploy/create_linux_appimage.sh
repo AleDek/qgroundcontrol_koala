@@ -28,7 +28,12 @@ if [ ! -f ${QGC_RELEASE_DIR}/${QGC_CUSTOM_BINARY_NAME} ]; then
   exit 1
 fi
 
-OUTPUT_DIR=${3-`pwd`}
+if [[ $# -eq 3 ]]; then
+  OUTPUT_DIR=$3
+else
+  OUTPUT_DIR=${3-`pwd`}
+fi
+
 OUTPUT_DIR=$(readlink -f $OUTPUT_DIR)
 echo "Output directory:" ${OUTPUT_DIR}
 
