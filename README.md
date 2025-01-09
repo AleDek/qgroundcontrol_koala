@@ -23,7 +23,13 @@ docker run --rm -v ${PWD}:/project/source -v ${PWD}/build:/project/build qgc-lin
 cd build/staging
 mv QGroundControl.AppImage QGroundControl_koala.AppImage
 ```
-then find appimage in qgroundcontrol_koala/build/staging
+then find appimage in qgroundcontrol_Koala/build/staging
+
+If error occours with message "Failure to open file: /project/build/Makefile", run docker with root user (-u 0):
+```sh
+docker run --rm -u 0 -v ${PWD}:/project/source -v ${PWD}/build:/project/build qgc-linux-docker
+
+```
 
 ### build android
 build android apk using docker 

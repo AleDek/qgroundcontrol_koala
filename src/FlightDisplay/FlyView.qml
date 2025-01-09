@@ -17,6 +17,8 @@ import QtPositioning            5.3
 import QtQuick.Window           2.2
 import QtQml.Models             2.1
 
+import QtQuick.Shapes           1.15
+
 import QGroundControl               1.0
 import QGroundControl.Controllers   1.0
 import QGroundControl.Controls      1.0
@@ -63,11 +65,14 @@ Item {
     property bool   _concledState:          _activeVehicle   ? _activeVehicle.getConcLedState() : false  // custom
 
     property string _koala_state:           _activeVehicle   ? _activeVehicle.koala_state.rawValue : "Not connected" //custom
-    property int   _koala_clamp_busy:       _activeVehicle   ? _activeVehicle.koala_clamp_busy.rawValue : 0 //custom
-    property int   _koala_autonomous:       _activeVehicle   ? _activeVehicle.koala_autonomous.rawValue : 0 //custom
+    property int    _koala_clamp_busy:      _activeVehicle   ? _activeVehicle.koala_clamp_busy.rawValue : 0 //custom
+    property int    _koala_autonomous:      _activeVehicle   ? _activeVehicle.koala_autonomous.rawValue : 0 //custom
     property bool   _statusledState:        _activeVehicle   ? _activeVehicle.getStatusLedState() : false  // custom
 
     property bool   _autonomousledState:    _activeVehicle   ? _activeVehicle.getAutonomousLedState() : false  // custom
+    property int    _crawler_is_onboard:    _activeVehicle   ? _activeVehicle.koala_crawler_onboard.rawValue : 0  // custom
+
+    property bool   _view_koala_aim: false   
 
 
     property real   _fullItemZorder:    0
@@ -82,12 +87,14 @@ Item {
     }
 
     QGCToolInsets {
-        id:                     _toolInsets
-        leftEdgeBottomInset:    _pipOverlay.visible ? _pipOverlay.x + _pipOverlay.width : 0
-        bottomEdgeLeftInset:    _pipOverlay.visible ? parent.height - _pipOverlay.y : 0
+        id:                     _toolInsets 
+        // leftEdgeBottomInset:    _pipOverlay.visible ? _pipOverlay.x + _pipOverlay.width : 0   
+        // bottomEdgeLeftInset:    _pipOverlay.visible ? parent.height - _pipOverlay.y : 0 
+        leftEdgeBottomInset:    0    //custom
+        bottomEdgeLeftInset:    0    //custom
     }
 
-    FlyViewWidgetLayer {
+    FlyViewWidgetLayer {       //custom, hiden mission control inside FlyViewWidgetLayer.qml
         id:                     widgetLayer
         anchors.top:            parent.top
         anchors.bottom:         parent.bottom
@@ -97,6 +104,7 @@ Item {
         parentToolInsets:       _toolInsets
         mapControl:             _mapControl
         visible:                !QGroundControl.videoManager.fullScreen
+        
     }
 
 
@@ -121,9 +129,10 @@ Item {
         z:                      widgetLayer.z + 1
 
         insetsToView:           customOverlay.totalToolInsets
-    }*/
+    }
+    */
 
-    GuidedActionsController {
+    GuidedActionsController {   
         id:                 guidedActionsController
         missionController:  _missionController
         actionList:         _guidedActionList
@@ -193,24 +202,13 @@ Item {
 
      //-----------------------------------------------------------> CUSTOM WIDGET - DEBUG VECT Viewer v1.0 (MAVROS)
 
-    // Rectangle {  // Widget personalizzato
-    //     width: 400 // larghezza
-    //     height: 250 // altezza
-    //     color: "white" // Colore del bordo
-    //     opacity: 0.7  // Regola l'opacità del widget
-    //     radius: 15 // Raggio più grande per angoli arrotondati
-    //     // Allinea il widget a sinistra
-    //     anchors.left: parent.left
-    //     anchors.leftMargin: 5 // Aggiungi un margine sinistro all'intero Rectangle
-    //     anchors.verticalCenter: parent.verticalCenter
-    // }
-
-    Rectangle {  
+ 
+    Rectangle {  //CUSTOM KOALA STATE
         width: 368 // Riduci la larghezza del rettangolo interno
         height: 268 // Riduci l'altezza del rettangolo interno
         // color: "black"
         color: Qt.rgba(106/255., 130/255., 152/255., 1)
-        opacity: 1.0 //
+        opacity: 0.7 // 1.0 TODO
         radius: 10
         // Allinea il rettangolo interno a sinistra
         anchors.left: parent.left
@@ -376,7 +374,7 @@ Item {
                 // height: parent.height / 1.8 // Altezza uguale a quella del parent : 1,5 
                 height: 120// Altezza uguale a quella del parent : 1,5 
                 color: "azure"
-                opacity: 1.0
+                opacity: 0.7 //1.0 TODO
                 radius: 10
                 Row{
                     spacing: 60
@@ -475,8 +473,68 @@ Item {
                 }
             }
         }
-          
+        MouseArea {
+            anchors.fill:   parent
+            onClicked: {
+                _view_koala_aim = !_view_koala_aim
+                // _root.clicked()
+            }
+        }
     }
+
+    Rectangle { // custom KOALA AIM
+        width:      parent.width  
+        height:     parent.height
+        color:      "transparent"
+        anchors.right: parent.right
+        // color: "azure"
+        // color: "transparent"
+        // border.color: qgcPal.text
+        // border.width: 0
+        
+        // Rectangle { // vertical line -- pipe
+        //     anchors.centerIn: parent // This centers the line horizontally inside the parent rectangle
+        //     width:      5 
+        //     height:     parent.height
+        //     // color:  _view_koala_aim ? "red" : "transparent"  // Line color
+        //     color: "red"
+        //     visible: (_crawler_is_onboard === -2 && _view_koala_aim) 
+        // }
+        Shape { // trapezoid shape -- pipe
+            width: parent.width  
+            height: parent.height
+            anchors.centerIn: parent
+            ShapePath {
+                strokeWidth: 4
+                strokeColor: "red"
+                fillColor: "transparent"
+                // strokeStyle: ShapePath.DashLines   //tratteggiato
+                // dashPattern: [ 1, 4 ]
+                startX: 2*parent.width/6; startY: 0
+                PathLine { x: 2*parent.width/5; y: parent.height -80}
+                PathLine { x: 3*parent.width/5; y: parent.height -80}
+                PathLine { x: 4*parent.width/6; y: 0}
+            }
+            visible: (_crawler_is_onboard === -2 && _view_koala_aim) //-2
+        }
+        
+        Rectangle { // ellipse -- aruco
+            anchors.bottom: parent.bottom
+            anchors.bottomMargin: 80
+            anchors.horizontalCenter: parent.horizontalCenter
+            width: parent.width/2.6 
+            height: 280
+            color:  "transparent"
+            // border.color: _view_koala_aim ? "red" : "transparent"
+            border.color: "red"
+            visible: (_crawler_is_onboard === -1 && _view_koala_aim)
+            border.width: 5
+            radius: 180
+        }
+        
+    }
+
+    
    
     Connections {
         target: _activeVehicle
@@ -487,17 +545,20 @@ Item {
             // statusText.text = _statusledState ? "online_msgreceived" : "offline_msgnotreceived"; //change text
             // statusText.color = _statusledState ? "yellow" : "red";
             statusled.color = _statusledState ? "red" : "green";
+            statusled.color = _koala_state === "Not Connected" ? "white" : statusled.color;
         }
         onConcLedStateChanged: {
             // Aggiorna la variabile in QML quando cambia lo stato
             _concledState = _activeVehicle.getConcLedState();
             concled.color = _concledState ? "red" : "green";
+            concled.color = _koala_state === "Not Connected" ? "white" : concled.color;
         }
 
         onAutonomousLedStateChanged: {
             // Aggiorna la variabile in QML quando cambia lo stato
             _autonomousledState = _activeVehicle.getAutonomousLedState();
             autonomousled.color = _autonomousledState ? "red" : "green";
+            autonomousled.color = _koala_state === "Not Connected" ? "white" : autonomousled.color;
         }
 
     }

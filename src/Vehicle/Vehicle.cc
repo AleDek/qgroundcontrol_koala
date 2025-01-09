@@ -125,7 +125,7 @@ const char* Vehicle::_gas_errFactName =            "gas_err"; //custom
 const char* Vehicle::_koala_stateFactName =        "koala_state"; //custom
 const char* Vehicle::_koala_clamp_busyFactName =   "koala_clamp_busy"; //custom
 const char* Vehicle::_koala_autonomousFactName =   "koala_autonomous"; //custom
-
+const char* Vehicle::_koala_crawler_onboardFactName =   "koala_crawler_onboard"; //custom
 
 // Standard connected vehicle
 Vehicle::Vehicle(LinkInterface*             link,
@@ -184,6 +184,7 @@ Vehicle::Vehicle(LinkInterface*             link,
     , _koala_stateFact              (0, _koala_stateFactName,       FactMetaData::valueTypeString) //custom
     , _koala_clamp_busyFact         (0, _koala_clamp_busyFactName,  FactMetaData::valueTypeInt16) //custom
     , _koala_autonomousFact         (0, _koala_autonomousFactName,  FactMetaData::valueTypeInt16) //custom
+    , _koala_crawler_onboardFact    (-1, _koala_crawler_onboardFactName,  FactMetaData::valueTypeInt16) //custom
     , _gpsFactGroup                 (this)
     , _gps2FactGroup                (this)
     , _windFactGroup                (this)
@@ -251,6 +252,15 @@ Vehicle::Vehicle(LinkInterface*             link,
     _chunkedStatusTextTimer.setSingleShot(true);
     _chunkedStatusTextTimer.setInterval(1000);
     connect(&_chunkedStatusTextTimer, &QTimer::timeout, this, &Vehicle::_chunkedStatusTextTimeout);
+
+
+    //koala app status debug timeout timer
+    _koalaAppDebugTimer.setSingleShot(true);
+    _koalaAppDebugTimer.setInterval(5000);
+    connect(&_koalaAppDebugTimer, &QTimer::timeout, this, &Vehicle::_koalaAppDebugTimeout);
+    
+
+
 
     _mav = uas();
 
@@ -344,6 +354,7 @@ Vehicle::Vehicle(MAV_AUTOPILOT              firmwareType,
     , _koala_stateFact                  (0, _koala_stateFactName,       FactMetaData::valueTypeString) //custom
     , _koala_clamp_busyFact             (0, _koala_clamp_busyFactName,  FactMetaData::valueTypeInt16) //custom
     , _koala_autonomousFact             (0, _koala_autonomousFactName,  FactMetaData::valueTypeInt16) //custom
+    , _koala_crawler_onboardFact        (-1, _koala_crawler_onboardFactName,  FactMetaData::valueTypeInt16) //custom
     , _gpsFactGroup                     (this)
     , _gps2FactGroup                    (this)
     , _windFactGroup                    (this)
@@ -490,6 +501,8 @@ void Vehicle::_commonInit()
     _addFact(&_koala_stateFact,          _koala_stateFactName); //custom
     _addFact(&_koala_clamp_busyFact,     _koala_clamp_busyFactName); //custom
     _addFact(&_koala_autonomousFact,     _koala_autonomousFactName); //custom
+    _addFact(&_koala_crawler_onboardFact,     _koala_crawler_onboardFactName); //custom
+    _koala_crawler_onboardFact.setRawValue(-1);   //custom
 
 
 
@@ -959,6 +972,7 @@ void Vehicle::_chunkedStatusTextTimeout(void)
     }
 }
 
+
 void Vehicle::_chunkedStatusTextCompleted(uint8_t compId)
 {
     ChunkedStatusTextInfo_t&    chunkedInfo =   _chunkedStatusTextInfoMap[compId];
@@ -1382,7 +1396,8 @@ void Vehicle::_handleDebugVect(mavlink_message_t& message)  //custom
     mavlink_debug_vect_t vect;
     mavlink_msg_debug_vect_decode(&message, &vect);
 
-    
+    _koalaAppDebugTimer.start(5000);
+
     // _gas_typeFact.setRawValue(vect.x);
     int gas_type_id = vect.x;
     float concentration = vect.y;
@@ -1459,14 +1474,25 @@ void Vehicle::_handleDebugInt(mavlink_message_t& message)  //custom
     mavlink_debug_t dbg_int;
     mavlink_msg_debug_decode(&message, &dbg_int);
 
-    
+    _koalaAppDebugTimer.start(5000);
   
     int koala_state = dbg_int.ind;
     int clamp_busy = dbg_int.value;
     QString messageText;
 
-    _koala_clamp_busyFact.setRawValue(clamp_busy);
+    // _koala_crawler_onboardFact.setRawValue(-2);
 
+
+    if(clamp_busy >= 0){  //value [0,1] = [not busy, busy]
+        _koala_clamp_busyFact.setRawValue(clamp_busy);
+        // Aggiorna _statusledState
+        if(clamp_busy > 0) _statusLedState = true;  
+        else _statusLedState = false;  
+    }
+    else{ //value [-1,-2] = [aruco, pipe]
+        _koala_crawler_onboardFact.setRawValue(clamp_busy);
+    }
+        
     switch(koala_state){
         case 0 :  _koala_stateFact.setRawValue("flyng_idle"); break;               //man
         case 1 :  _koala_stateFact.setRawValue("abort_landing"); break;            //auto
@@ -1517,16 +1543,9 @@ void Vehicle::_handleDebugInt(mavlink_message_t& message)  //custom
     else{
         _koala_autonomousFact.setRawValue(1);
         _autonomousLedState = true;
-
     }
 
 
-    // Aggiorna _statusledState
-    if(clamp_busy > 0) _statusLedState = true;  
-    else _statusLedState = false;  
-
-
-    
     if(_old_koala_state != koala_state){
         // QString messageText = _koala_stateFact.getRawValue();
         // messageText = QStringLiteral("Emergency, explosive gas at %1 percent ").arg(vect.y, 0, 'f', 1);
@@ -1536,6 +1555,26 @@ void Vehicle::_handleDebugInt(mavlink_message_t& message)  //custom
     
 
     // Emetti il segnale per notificare QML del cambiamento
+    emit statusLedStateChanged();
+    emit autonomousLedStateChanged();
+
+}
+
+void Vehicle::_koalaAppDebugTimeout(void) //custom
+{
+    // TBD
+    _gas_typeFact.setRawValue("-");
+    _gas_errFact.setRawValue("-");
+    _gas_concFact.setRawValue(0);
+    _concLedState = false;  
+    
+    _koala_stateFact.setRawValue("Not Connected");
+    _koala_autonomousFact.setRawValue(0);
+    _statusLedState = false;  
+    _autonomousLedState = false;
+    _old_koala_state = -1;
+
+    emit concLedStateChanged();
     emit statusLedStateChanged();
     emit autonomousLedStateChanged();
 

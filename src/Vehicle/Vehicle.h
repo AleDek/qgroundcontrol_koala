@@ -322,7 +322,7 @@ public:
     Q_PROPERTY(Fact* koala_state        READ koala_state        CONSTANT) //custom
     Q_PROPERTY(Fact* koala_clamp_busy   READ koala_clamp_busy   CONSTANT) //custom
     Q_PROPERTY(Fact* koala_autonomous   READ koala_autonomous   CONSTANT) //custom
-
+    Q_PROPERTY(Fact* koala_crawler_onboard   READ koala_crawler_onboard   CONSTANT) //custom
 
 
 
@@ -740,7 +740,7 @@ public:
     Fact* koala_state                       () { return &_koala_stateFact; } //custom
     Fact* koala_clamp_busy                  () { return &_koala_clamp_busyFact; } //custom
     Fact* koala_autonomous                  () { return &_koala_autonomousFact; } //custom
-
+    Fact* koala_crawler_onboard             () { return &_koala_crawler_onboardFact; } //custom
 
 
     FactGroup* gpsFactGroup                 () { return &_gpsFactGroup; }
@@ -1168,7 +1168,7 @@ private:
     bool setFlightModeCustom            (const QString& flightMode, uint8_t* base_mode, uint32_t* custom_mode);
     void _handleDebugVect               (mavlink_message_t& message); //custom
     void _handleDebugInt                (mavlink_message_t& message); //custom
-
+    void _koalaAppDebugTimeout          (void);
 
 
     static void _rebootCommandResultHandler(void* resultHandlerData, int compId, const mavlink_command_ack_t& ack, MavCmdResultFailureCode_t failureCode);
@@ -1352,6 +1352,8 @@ private:
     QMap<uint8_t /* compId */, ChunkedStatusTextInfo_t> _chunkedStatusTextInfoMap;
     QTimer _chunkedStatusTextTimer;
 
+    QTimer _koalaAppDebugTimer; //custom
+
     /// Callback for waitForMavlinkMessage
     ///     @param resultHandleData     Opaque data passed in to waitForMavlinkMessage call
     ///     @param commandResult        Ack result for command send
@@ -1469,7 +1471,7 @@ private:
     Fact _koala_stateFact; //custom
     Fact _koala_clamp_busyFact; //custom
     Fact _koala_autonomousFact; //custom
-
+    Fact _koala_crawler_onboardFact; //custom
 
 
 
@@ -1559,6 +1561,7 @@ private:
     static const char* _koala_stateFactName; //custom
     static const char* _koala_clamp_busyFactName; //custom
     static const char* _koala_autonomousFactName; //custom
+    static const char* _koala_crawler_onboardFactName; //custom
     int _old_koala_state;
 
 
